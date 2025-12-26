@@ -11,62 +11,59 @@ def get_latest_news():
     # 네이버 금융 경제 속보
     url = "https://finance.naver.com/news/news_list.naver?mode=LSD&section_id=101"
     
-    # [강화] 실제 브라우저와 거의 흡사한 헤더 정보
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Referer': 'https://www.naver.com/',
-        'Connection': 'keep-alive'
+        'Referer': 'https://finance.naver.com/'
     }
     
     try:
         resp = requests.get(url, headers=headers, timeout=15)
-        print(f"네이버 응답 상태 코드: {resp.status_code}") # 200이 나와야 성공입니다.
+        resp.encoding = 'euc-kr' 
         
         if resp.status_code != 200:
+            print(f"접속 실패 (상태코드: {resp.status_code})")
             return None, None
 
-        resp.encoding = 'euc-kr' 
         soup = BeautifulSoup(resp.text, 'html.parser')
         
-        # 제목을 찾는 경로를 여러 개 준비합니다 (하나라도 걸리게)
-        news_element = soup.select_one(".newsList .articleSubject a")
-        if not news_element:
-            news_element = soup.select_one("dt.articleSubject a")
-        if not news_element:
-            news_element = soup.select_one(".articleSubject a")
-
-        if news_element:
-            title = news_element.get_text(strip=True)
-            link = "https://finance.naver.com" + news_element['href']
-            return title, link
+        # [수정] 가장 확실한 방법: 모든 링크(a) 중에서 뉴스 제목처럼 보이는 것을 순서대로 탐색
+        # 네이버 금융 뉴스는 보통 newsList 클래스 안의 dt 또는 dd 태그 안에 있습니다.
+        candidates = soup.select('.newsList dt a, .newsList dd a, dt.articleSubject a, .articleSubject a')
+        
+        for cand in candidates:
+            title = cand.get_text(strip=True)
+            link_href = cand.get('href', '')
+            
+            # 제목이 너무 짧거나(광고 등) 링크가 없으면 건너뜁니다.
+            if len(title) > 5 and 'article_id' in link_href:
+                full_link = "https://finance.naver.com" + link_href
+                return title, full_link
                 
     except Exception as e:
-        print(f"네이버 크롤링 중 오류: {e}")
+        print(f"크롤링 중 오류 발생: {e}")
         
     return None, None
 
 def main():
-    print("--- 네이버 뉴스 복구 및 중복 방지 가동 ---")
+    print("--- 네이버 뉴스 정밀 추적 가동 ---")
     title, link = get_latest_news()
     
     if not title:
-        print("뉴스를 가져오는 데 실패했습니다. 네이버가 서버 접속을 차단한 것 같습니다.")
+        print("뉴스를 찾지 못했습니다. 네이버가 평소와 다른 화면을 보내준 것 같습니다.")
         return
 
-    # 중복 체크 로직
+    # 중복 체크
     last_title = ""
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r", encoding="utf-8") as f:
             last_title = f.read().strip()
 
     if title == last_title:
-        print(f"중복 뉴스입니다 (전송 건너뜀): {title}")
+        print(f"이미 처리된 뉴스입니다: {title}")
         return
 
-    # 전송 로직
-    print(f"새 뉴스 발견: {title}")
+    # 전송
+    print(f"발견된 새 뉴스: {title}")
     message = f"📢 [네이버 증권속보]\n\n{title}\n\n링크: {link}"
     send_url = f"https://api.telegram.org/bot{token}/sendMessage"
     
