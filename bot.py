@@ -9,7 +9,6 @@ DB_FILE = "last_title.txt"
 
 def get_latest_news():
     # 구글 뉴스 RSS (대한민국 경제 섹션)
-    # 이 경로는 깃허브 서버에서도 차단 없이 아주 잘 작동합니다.
     url = "https://news.google.com/rss/topics/CAAqIggKIhxDQkFTRHdvSkwyMHZNR290T1RWakVnSnNrYzhvQUFQAQ?hl=ko&gl=KR&ceid=KR:ko"
     
     headers = {
@@ -17,13 +16,14 @@ def get_latest_news():
     }
     
     try:
-        # 구글 뉴스는 보안이 유연하여 응답이 빠릅니다.
         resp = requests.get(url, headers=headers, timeout=10)
-        # 구글 뉴스는 UTF-8을 사용하여 한글 깨짐이 없습니다.
-        soup = BeautifulSoup(resp.content, 'xml') # XML 파서 사용
+        # [수정] 외부 라이브러리가 필요한 'xml' 대신 내장된 'html.parser'를 사용합니다.
+        soup = BeautifulSoup(resp.content, 'html.parser')
         
+        # RSS의 기사 단위인 <item> 태그를 찾습니다.
         item = soup.find('item')
         if item:
+            # 제목과 링크 추출
             title = item.title.get_text(strip=True)
             link = item.link.get_text(strip=True)
             return title, link
