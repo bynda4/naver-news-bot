@@ -8,37 +8,37 @@ chat_id = os.environ.get('CHAT_ID')
 DB_FILE = "last_title.txt"
 
 def get_latest_news():
-    # 네이버 뉴스 RSS (경제 섹션) - 차단이 거의 없는 기계용 통로
-    url = "https://news.naver.com/rss/sections/101"
+    # 구글 뉴스 RSS (대한민국 경제 섹션)
+    # 이 경로는 깃허브 서버에서도 차단 없이 아주 잘 작동합니다.
+    url = "https://news.google.com/rss/topics/CAAqIggKIhxDQkFTRHdvSkwyMHZNR290T1RWakVnSnNrYzhvQUFQAQ?hl=ko&gl=KR&ceid=KR:ko"
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     
     try:
+        # 구글 뉴스는 보안이 유연하여 응답이 빠릅니다.
         resp = requests.get(url, headers=headers, timeout=10)
-        # RSS는 XML 형식이므로 html.parser로도 충분히 읽을 수 있습니다.
-        soup = BeautifulSoup(resp.content, 'html.parser')
+        # 구글 뉴스는 UTF-8을 사용하여 한글 깨짐이 없습니다.
+        soup = BeautifulSoup(resp.content, 'xml') # XML 파서 사용
         
-        # RSS에서 개별 기사는 <item> 태그 안에 있습니다.
         item = soup.find('item')
         if item:
-            # <title>과 <link> 태그를 찾습니다.
-            title = item.find('title').get_text(strip=True)
-            link = item.find('link').get_text(strip=True)
+            title = item.title.get_text(strip=True)
+            link = item.link.get_text(strip=True)
             return title, link
             
     except Exception as e:
-        print(f"RSS 읽기 오류: {e}")
+        print(f"구글 RSS 읽기 오류: {e}")
         
     return None, None
 
 def main():
-    print("--- RSS 봇 가동 시작 ---")
+    print("--- 구글 뉴스 RSS 봇 가동 ---")
     title, link = get_latest_news()
     
     if not title:
-        print("뉴스를 가져오는 데 실패했습니다. RSS 피드 접근에 문제가 있습니다.")
+        print("뉴스를 가져오는 데 실패했습니다.")
         return
 
     # 중복 체크
@@ -56,14 +56,16 @@ def main():
     message = f"📢 [경제 뉴스 속보]\n\n{title}\n\n링크: {link}"
     send_url = f"https://api.telegram.org/bot{token}/sendMessage"
     
-    res = requests.post(send_url, data={'chat_id': chat_id, 'text': message})
-    
-    if res.status_code == 200:
-        with open(DB_FILE, "w", encoding="utf-8") as f:
-            f.write(title)
-        print("--- 전송 및 기록 완료 ---")
-    else:
-        print(f"텔레그램 전송 실패: {res.status_code}")
+    try:
+        res = requests.post(send_url, data={'chat_id': chat_id, 'text': message})
+        if res.status_code == 200:
+            with open(DB_FILE, "w", encoding="utf-8") as f:
+                f.write(title)
+            print("--- 전송 완료 ---")
+        else:
+            print(f"전송 실패: {res.status_code}")
+    except Exception as e:
+        print(f"텔레그램 전송 오류: {e}")
 
 if __name__ == "__main__":
     main()
