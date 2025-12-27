@@ -23,7 +23,7 @@ def get_latest_news():
         content = resp.text
         items = re.findall(r'<item>(.*?)</item>', content, re.DOTALL | re.IGNORECASE)
         
-        print(f"로그: 총 {len(items)}개의 기사 후보를 분석합니다.")
+        print(f"로그: 총 {len(items)}개의 후보 중 진짜 뉴스를 선별합니다.")
 
         for idx, item in enumerate(items):
             title_match = re.search(r'<title[^>]*>(.*?)</title>', item, re.DOTALL | re.IGNORECASE)
@@ -33,25 +33,24 @@ def get_latest_news():
                 title = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', title_match.group(1)).strip()
                 link = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', link_match.group(1)).strip()
                 
-                # [제목 정밀 검증]
-                # 1. 제목이 너무 짧지 않아야 함
-                # 2. 제목에 'naver.com'이나 'http' 같은 주소가 포함되지 않아야 함
-                if len(title) > 15 and "naver.com" not in title.lower() and "http" not in title.lower():
+                # [제목 선별 기준 강화] 
+                # 제목이 20자보다 길어야 진짜 뉴스 기사 제목으로 인정합니다. (단순 카테고리명 방지)
+                if len(title) > 20 and "naver.com" not in title.lower():
                     clean_title = title.split(' - ')[0].strip()
-                    print(f"로그: {idx+1}번째 항목에서 진짜 기사 제목 확정! ({clean_title[:30]}...)")
+                    print(f"로그: {idx+1}번째 항목에서 진짜 뉴스 확정! ({clean_title[:30]}...)")
                     return clean_title, link
                     
     except Exception as e:
-        print(f"추출 중 오류: {e}")
+        print(f"추출 오류: {e}")
         
     return None, None
 
 def main():
-    print("--- 뉴스 제목 텍스트 정밀 검증 가동 ---")
+    print("--- 뉴스 본문 제목 추출 모드 ---")
     title, link = get_latest_news()
     
     if not title:
-        print("로그: 모든 리스트를 검사했지만 유효한 텍스트 제목을 찾지 못했습니다.")
+        print("로그: 유효한 뉴스 문장을 찾지 못했습니다.")
         return
 
     # 중복 체크
@@ -61,10 +60,10 @@ def main():
             last_title = f.read().strip()
 
     if title == last_title:
-        print(f"로그: 이미 전송한 기사입니다. (제목: {title[:20]}...)")
+        print(f"로그: 새로운 뉴스가 아직 올라오지 않았습니다. (최신: {title[:15]}...)")
         return
 
-    # 전송
+    # 텔레그램 전송
     message = f"📢 [경제 실시간 속보]\n\n📌 {title}\n\n🔗 링크: {link}"
     send_url = f"https://api.telegram.org/bot{token}/sendMessage"
     
