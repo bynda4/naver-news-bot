@@ -8,7 +8,6 @@ chat_id = os.environ.get('CHAT_ID')
 DB_FILE = "last_title.txt"
 
 def get_latest_news():
-    # 구글 RSS (네이버 경제 뉴스)
     url = "https://news.google.com/rss/search?q=site:news.naver.com+경제&hl=ko&gl=KR&ceid=KR:ko"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -18,44 +17,40 @@ def get_latest_news():
         resp = requests.get(url, headers=headers, timeout=15)
         content = resp.text
 
-        # [핵심] <item> 태그들만 모두 찾아 리스트로 만듭니다.
+        # 모든 <item> 항목을 리스트로 추출
         items = re.findall(r'<item>(.*?)</item>', content, re.DOTALL | re.IGNORECASE)
         
-        if not items:
-            print("기사 항목(item)을 찾을 수 없습니다.")
-            return None, None
-
-        # 첫 번째 기사(items[0])를 선택
-        first_item = items[0]
-
-        # 제목 추출 (<title>...</title>)
-        title_match = re.search(r'<title>(.*?)</title>', first_item, re.DOTALL | re.IGNORECASE)
-        title = title_match.group(1) if title_match else "제목 없음"
-        
-        # 링크 추출 (<link>...</link>)
-        link_match = re.search(r'<link>(.*?)</link>', first_item, re.DOTALL | re.IGNORECASE)
-        link = link_match.group(1) if link_match else ""
-        
-        # 불필요한 태그 및 CDATA 제거
-        title = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', title).strip()
-        link = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', link).strip()
-        
-        # 구글 뉴스 특유의 꼬리표 " - 네이버 뉴스" 제거
-        title = title.split(' - ')[0]
-        
-        return title, link
+        for item in items:
+            # 제목과 링크 추출
+            title_match = re.search(r'<title>(.*?)</title>', item, re.DOTALL | re.IGNORECASE)
+            link_match = re.search(r'<link>(.*?)</link>', item, re.DOTALL | re.IGNORECASE)
+            
+            if title_match and link_match:
+                raw_title = title_match.group(1)
+                link = link_match.group(1)
                 
+                # CDATA 및 태그 제거
+                title = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', raw_title).strip()
+                link = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', link).strip()
+                
+                # ' - 네이버 뉴스' 꼬리표 제거
+                title = title.split(' - ')[0]
+
+                # [중요] 필터링: 제목이 너무 짧거나(예: '경제'), 채널명인 경우 건너뜀
+                if len(title) > 10 and "Naver News" not in title:
+                    return title, link
+                    
     except Exception as e:
-        print(f"오류 발생: {e}")
-        return None, None
+        print(f"추출 오류: {e}")
+        
+    return None, None
 
 def main():
-    print("--- 실제 기사 1순위 수집 가동 ---")
+    print("--- 뉴스 리스트 정밀 스캔 시작 ---")
     title, link = get_latest_news()
     
-    # 채널 대제목인 '경제 - Naver News'가 잡히면 무시하도록 방어
-    if not title or "Naver News" in title or title == "경제":
-        print(f"유효하지 않은 제목 건너뜀: {title}")
+    if not title:
+        print("유효한 기사를 리스트에서 찾지 못했습니다.")
         return
 
     # 중복 체크
@@ -65,12 +60,12 @@ def main():
             last_title = f.read().strip()
 
     if title == last_title:
-        print(f"중복 뉴스 (전송 안 함): {title}")
+        print(f"중복 뉴스 (건너뜀): {title}")
         return
 
     # 텔레그램 전송
-    print(f"새 뉴스 발견 및 전송: {title}")
-    message = f"📢 [네이버 경제 뉴스]\n\n{title}\n\n링크: {link}"
+    print(f"새 뉴스 발견: {title}")
+    message = f"📢 [네이버 경제 속보]\n\n{title}\n\n링크: {link}"
     send_url = f"https://api.telegram.org/bot{token}/sendMessage"
     
     try:
@@ -78,11 +73,11 @@ def main():
         if res.status_code == 200:
             with open(DB_FILE, "w", encoding="utf-8") as f:
                 f.write(title)
-            print("--- 전송 및 중복 방지 기록 완료 ---")
+            print("--- 전송 완료 ---")
         else:
             print(f"전송 실패: {res.status_code}")
     except Exception as e:
-        print(f"메시지 전송 오류: {e}")
+        print(f"에러: {e}")
 
 if __name__ == "__main__":
     main()
