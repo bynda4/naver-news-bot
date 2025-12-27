@@ -10,7 +10,6 @@ DB_FILE = "last_title.txt"
 
 def get_latest_news():
     keyword = quote("경제")
-    # 구글 뉴스 검색 RSS (네이버 뉴스 전용)
     url = f"https://news.google.com/rss/search?q={keyword}+site:news.naver.com&hl=ko&gl=KR&ceid=KR:ko"
     
     headers = {
@@ -22,10 +21,9 @@ def get_latest_news():
         if resp.status_code != 200: return None, None
 
         content = resp.text
-        # 1. 모든 기사 아이템을 리스트로 추출
         items = re.findall(r'<item>(.*?)</item>', content, re.DOTALL | re.IGNORECASE)
         
-        print(f"로그: 총 {len(items)}개의 기사 후보를 발견했습니다.")
+        print(f"로그: 총 {len(items)}개의 기사 후보를 분석합니다.")
 
         for idx, item in enumerate(items):
             title_match = re.search(r'<title[^>]*>(.*?)</title>', item, re.DOTALL | re.IGNORECASE)
@@ -35,12 +33,12 @@ def get_latest_news():
                 title = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', title_match.group(1)).strip()
                 link = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', link_match.group(1)).strip()
                 
-                # [핵심 필터] 
-                # 1. 제목이 너무 짧은 '대문 제목'은 무시합니다.
-                # 2. 진짜 뉴스는 보통 "제목 - 언론사" 형식이므로 ' - '이 포함되어 있습니다.
-                if len(title) > 15 and "Naver News" not in title:
+                # [제목 정밀 검증]
+                # 1. 제목이 너무 짧지 않아야 함
+                # 2. 제목에 'naver.com'이나 'http' 같은 주소가 포함되지 않아야 함
+                if len(title) > 15 and "naver.com" not in title.lower() and "http" not in title.lower():
                     clean_title = title.split(' - ')[0].strip()
-                    print(f"로그: {idx+1}번째 항목에서 진짜 기사 발견! ({clean_title[:20]}...)")
+                    print(f"로그: {idx+1}번째 항목에서 진짜 기사 제목 확정! ({clean_title[:30]}...)")
                     return clean_title, link
                     
     except Exception as e:
@@ -49,11 +47,11 @@ def get_latest_news():
     return None, None
 
 def main():
-    print("--- 뉴스 리스트 정밀 스캔 가동 ---")
+    print("--- 뉴스 제목 텍스트 정밀 검증 가동 ---")
     title, link = get_latest_news()
     
     if not title:
-        print("로그: 리스트를 다 뒤졌지만 유효한 기사 제목을 찾지 못했습니다.")
+        print("로그: 모든 리스트를 검사했지만 유효한 텍스트 제목을 찾지 못했습니다.")
         return
 
     # 중복 체크
@@ -63,7 +61,7 @@ def main():
             last_title = f.read().strip()
 
     if title == last_title:
-        print(f"로그: 최신 기사가 이미 전송된 것과 같습니다. ({title[:15]}...)")
+        print(f"로그: 이미 전송한 기사입니다. (제목: {title[:20]}...)")
         return
 
     # 전송
@@ -75,7 +73,7 @@ def main():
         if res.status_code == 200:
             with open(DB_FILE, "w", encoding="utf-8") as f:
                 f.write(title)
-            print("--- 텔레그램 전송 완료 ---")
+            print(f"--- 전송 완료: {title[:20]}... ---")
     except Exception as e:
         print(f"전송 에러: {e}")
 
