@@ -4,12 +4,17 @@ on:
   push:
     branches: [ main ]
   schedule:
-    - cron: '*/5 * * * *'  # 5분마다 실행 (실제 지연 10~20분 발생 가능)
-  workflow_dispatch:      # 수동 실행 버튼 생성
+    - cron: '*/6 * * * *'  # 6분마다로 살짝 변경 (재등록 유도)
+  workflow_dispatch:      # Actions 탭에서 수동 실행 버튼 생성
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 여러 개의 스케줄이 겹쳐서 실행되는 것을 방지
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -32,6 +37,6 @@ jobs:
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git add last_title.txt || true
-          git commit -m "Update last news title" || true
+          git add *.txt || true
+          git commit -m "Update last news titles" || true
           git push || true
