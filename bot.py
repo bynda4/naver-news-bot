@@ -17,27 +17,27 @@ def get_latest_news():
         resp = requests.get(url, headers=headers, timeout=15)
         content = resp.text
 
-        # 모든 <item> 항목을 리스트로 추출
+        # <item> 태그 단위로 쪼개기
         items = re.findall(r'<item>(.*?)</item>', content, re.DOTALL | re.IGNORECASE)
         
         for item in items:
-            # 제목과 링크 추출
-            title_match = re.search(r'<title>(.*?)</title>', item, re.DOTALL | re.IGNORECASE)
-            link_match = re.search(r'<link>(.*?)</link>', item, re.DOTALL | re.IGNORECASE)
+            # [수정] 제목 추출 방식을 더 유연하게 (태그 내부의 어떤 문자든 낚아챔)
+            title_match = re.search(r'<title[^>]*>(.*?)</title>', item, re.DOTALL | re.IGNORECASE)
+            link_match = re.search(r'<link[^>]*>(.*?)</link>', item, re.DOTALL | re.IGNORECASE)
             
             if title_match and link_match:
-                raw_title = title_match.group(1)
+                title = title_match.group(1)
                 link = link_match.group(1)
                 
-                # CDATA 및 태그 제거
-                title = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', raw_title).strip()
+                # CDATA, HTML 태그, 특수문자 제거
+                title = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', title).strip()
                 link = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', link).strip()
                 
-                # ' - 네이버 뉴스' 꼬리표 제거
-                title = title.split(' - ')[0]
+                # ' - 네이버 뉴스' 꼬리표 및 지저분한 앞뒤 공백 제거
+                title = title.split(' - ')[0].strip()
 
-                # [중요] 필터링: 제목이 너무 짧거나(예: '경제'), 채널명인 경우 건너뜀
-                if len(title) > 10 and "Naver News" not in title:
+                # 제목이 제대로 추출되었고 너무 짧지 않은지 확인
+                if len(title) > 5 and "Naver News" not in title and title != "경제":
                     return title, link
                     
     except Exception as e:
@@ -46,11 +46,11 @@ def get_latest_news():
     return None, None
 
 def main():
-    print("--- 뉴스 리스트 정밀 스캔 시작 ---")
+    print("--- 제목 추출 정밀 보정 가동 ---")
     title, link = get_latest_news()
     
     if not title:
-        print("유효한 기사를 리스트에서 찾지 못했습니다.")
+        print("유효한 기사 제목을 찾지 못했습니다.")
         return
 
     # 중복 체크
@@ -64,8 +64,11 @@ def main():
         return
 
     # 텔레그램 전송
-    print(f"새 뉴스 발견: {title}")
-    message = f"📢 [네이버 경제 속보]\n\n{title}\n\n링크: {link}"
+    print(f"새 뉴스 전송 시도: {title}")
+    
+    # [수정] 메시지 포맷 가독성 높임
+    message = f"📢 [네이버 경제 뉴스]\n\n📌 {title}\n\n🔗 링크: {link}"
+    
     send_url = f"https://api.telegram.org/bot{token}/sendMessage"
     
     try:
@@ -73,11 +76,11 @@ def main():
         if res.status_code == 200:
             with open(DB_FILE, "w", encoding="utf-8") as f:
                 f.write(title)
-            print("--- 전송 완료 ---")
+            print("--- 전송 및 기록 성공 ---")
         else:
-            print(f"전송 실패: {res.status_code}")
+            print(f"전송 실패 코드: {res.status_code}")
     except Exception as e:
-        print(f"에러: {e}")
+        print(f"네트워크 에러: {e}")
 
 if __name__ == "__main__":
     main()
