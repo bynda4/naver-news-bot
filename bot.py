@@ -5,10 +5,9 @@ import re
 # 환경 변수 설정
 token = os.environ.get('TELEGRAM_TOKEN')
 chat_id = os.environ.get('CHAT_ID')
-DB_FILE = "last_title.txt"
 
 def get_latest_news():
-    # [변경] 가장 신뢰도 높은 연합뉴스 경제 속보 RSS
+    # 연합뉴스 경제 속보 RSS
     url = "https://www.yna.co.kr/rss/economy.xml"
     
     headers = {
@@ -17,26 +16,22 @@ def get_latest_news():
     
     try:
         resp = requests.get(url, headers=headers, timeout=15)
-        # 인코딩 설정 (한글 깨짐 방지)
-        resp.encoding = 'utf-8'
+        resp.encoding = 'utf-8' # 한글 깨짐 방지
         content = resp.text
 
-        # 1. <item> 태그 단위로 기사 리스트 추출
+        # <item> 태그 단위로 기사 리스트 추출
         items = re.findall(r'<item>(.*?)</item>', content, re.DOTALL)
         
-        for item in items:
-            # 2. 제목과 링크 추출
+        if items:
+            # 첫 번째 아이템(가장 최신 뉴스) 추출
+            item = items[0]
             title_match = re.search(r'<title[^>]*>(.*?)</title>', item, re.DOTALL)
             link_match = re.search(r'<link[^>]*>(.*?)</link>', item, re.DOTALL)
             
             if title_match and link_match:
-                # CDATA 등 불순물 제거
                 title = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', title_match.group(1)).strip()
                 link = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', link_match.group(1)).strip()
-                
-                # 'NAVER'나 '경제' 같은 짧은 노이즈가 아닌 진짜 뉴스 문장인지 확인
-                if len(title) > 10:
-                    return title, link
+                return title, link
                     
     except Exception as e:
         print(f"추출 오류: {e}")
@@ -44,24 +39,16 @@ def get_latest_news():
     return None, None
 
 def main():
-    print("--- 연합뉴스 경제 속보 소스 가동 ---")
+    print("--- 중복 체크 없이 무조건 전송 모드 가동 ---")
     title, link = get_latest_news()
     
     if not title:
-        print("로그: 유효한 기사를 찾지 못했습니다.")
+        print("로그: 전송할 기사를 찾지 못했습니다.")
         return
 
-    # 중복 체크
-    last_title = ""
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            last_title = f.read().strip()
-
-    if title == last_title:
-        print(f"로그: 이미 전송한 기사입니다. ({title[:15]}...)")
-        return
-
-    # 최종 전송
+    # [수정] 중복 체크 로직을 완전히 삭제했습니다.
+    # 실행 시마다 무조건 메시지를 보냅니다.
+    
     print(f"전송 시도: {title}")
     message = f"📢 [경제 속보]\n\n📌 {title}\n\n🔗 링크: {link}"
     
@@ -69,9 +56,9 @@ def main():
     try:
         res = requests.post(send_url, data={'chat_id': chat_id, 'text': message})
         if res.status_code == 200:
-            with open(DB_FILE, "w", encoding="utf-8") as f:
-                f.write(title)
-            print("--- 전송 성공! ---")
+            print("--- 텔레그램 전송 성공! ---")
+        else:
+            print(f"전송 실패 상태코드: {res.status_code}")
     except Exception as e:
         print(f"네트워크 오류: {e}")
 
