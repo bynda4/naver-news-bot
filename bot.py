@@ -1,15 +1,15 @@
 import requests
 import os
 import re
-from urllib.parse import quote
 
 # 환경 변수 설정
 token = os.environ.get('TELEGRAM_TOKEN')
 chat_id = os.environ.get('CHAT_ID')
+DB_FILE = "last_title.txt"
 
-def get_all_news():
-    keyword = quote("경제")
-    url = f"https://news.google.com/rss/search?q={keyword}+site:news.naver.com&hl=ko&gl=KR&ceid=KR:ko"
+def get_latest_news():
+    # [변경] 가장 신뢰도 높은 연합뉴스 경제 속보 RSS
+    url = "https://www.yna.co.kr/rss/economy.xml"
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -17,50 +17,63 @@ def get_all_news():
     
     try:
         resp = requests.get(url, headers=headers, timeout=15)
+        # 인코딩 설정 (한글 깨짐 방지)
+        resp.encoding = 'utf-8'
         content = resp.text
-        
-        # 1. <item> 태그 단위로 모든 기사 덩어리를 찾습니다.
-        items = re.findall(r'<item>(.*?)</item>', content, re.DOTALL | re.IGNORECASE)
-        print(f"로그: 총 {len(items)}개의 기사를 발견했습니다.")
 
-        results = []
-        for item in items:
-            # 2. 각 아이템 안에서 제목만 추출
-            title_match = re.search(r'<title[^>]*>(.*?)</title>', item, re.DOTALL | re.IGNORECASE)
-            if title_match:
-                title = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', title_match.group(1)).strip()
-                # 꼬리표 제거
-                title = title.split(' - ')[0].strip()
-                results.append(title)
+        # 1. <item> 태그 단위로 기사 리스트 추출
+        items = re.findall(r'<item>(.*?)</item>', content, re.DOTALL)
         
-        return results
+        for item in items:
+            # 2. 제목과 링크 추출
+            title_match = re.search(r'<title[^>]*>(.*?)</title>', item, re.DOTALL)
+            link_match = re.search(r'<link[^>]*>(.*?)</link>', item, re.DOTALL)
+            
+            if title_match and link_match:
+                # CDATA 등 불순물 제거
+                title = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', title_match.group(1)).strip()
+                link = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', link_match.group(1)).strip()
+                
+                # 'NAVER'나 '경제' 같은 짧은 노이즈가 아닌 진짜 뉴스 문장인지 확인
+                if len(title) > 10:
+                    return title, link
                     
     except Exception as e:
-        print(f"데이터 추출 중 에러: {e}")
-        return []
+        print(f"추출 오류: {e}")
+        
+    return None, None
 
 def main():
-    print("--- 100개 기사 무조건 전수 전송 가동 ---")
-    news_list = get_all_news()
+    print("--- 연합뉴스 경제 속보 소스 가동 ---")
+    title, link = get_latest_news()
     
-    if not news_list:
-        print("로그: 기사를 하나도 찾지 못했습니다.")
+    if not title:
+        print("로그: 유효한 기사를 찾지 못했습니다.")
         return
 
-    # 3. 텔레그램 전송 (너무 많으면 텔레그램에서 차단될 수 있으니 10개씩 묶어서 보냅니다)
-    print(f"로그: 총 {len(news_list)}개의 제목을 전송합니다.")
+    # 중복 체크
+    last_title = ""
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            last_title = f.read().strip()
+
+    if title == last_title:
+        print(f"로그: 이미 전송한 기사입니다. ({title[:15]}...)")
+        return
+
+    # 최종 전송
+    print(f"전송 시도: {title}")
+    message = f"📢 [경제 속보]\n\n📌 {title}\n\n🔗 링크: {link}"
     
-    # 5개씩 끊어서 한 메시지에 담아 보냅니다 (도배 방지)
-    for i in range(0, len(news_list), 5):
-        chunk = news_list[i:i+5]
-        message = "📢 [수집된 뉴스 리스트]\n\n"
-        for idx, t in enumerate(chunk):
-            message += f"{i + idx + 1}. {t}\n"
-        
-        send_url = f"https://api.telegram.org/bot{token}/sendMessage"
-        requests.post(send_url, data={'chat_id': chat_id, 'text': message})
-        
-    print("--- 전송 시도 완료 ---")
+    send_url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        res = requests.post(send_url, data={'chat_id': chat_id, 'text': message})
+        if res.status_code == 200:
+            with open(DB_FILE, "w", encoding="utf-8") as f:
+                f.write(title)
+            print("--- 전송 성공! ---")
+    except Exception as e:
+        print(f"네트워크 오류: {e}")
 
 if __name__ == "__main__":
     main()
