@@ -1,19 +1,17 @@
-name: Naver News Bot
+name: News Bot Auto Run
 
 on:
+  push:
+    branches: [ main ]
   schedule:
-    - cron: '*/5 * * * *'
-  workflow_dispatch:
+    - cron: '*/5 * * * *'  # 5분마다 자동으로 실행
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # 깃허브에 파일을 쓸 수 있는 권한 부여
-    permissions:
-      contents: write
-      
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -21,20 +19,19 @@ jobs:
           python-version: '3.9'
 
       - name: Install dependencies
-        run: |
-          pip install requests beautifulsoup4
+        run: pip install requests
 
-      - name: Run Bot
+      - name: Run bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python bot.py
 
-      # 변경된 last_title.txt 파일을 깃허브 저장소에 다시 저장(Push)합니다.
-      - name: Commit and Push changes
+      # 중복 체크 기능을 다시 켤 때를 대비한 자동 저장 설정
+      - name: Commit and push changes
         run: |
-          git config --global user.name 'github-actions'
-          git config --global user.email 'github-actions@github.com'
-          git add last_title.txt
-          # 변경사항이 있을 때만 커밋합니다.
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update last news title" && git push)
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git add last_title.txt || true
+          git commit -m "Update last news title" || true
+          git push || true
