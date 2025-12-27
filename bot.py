@@ -12,8 +12,8 @@ NEWS_SOURCES = [
         "db": "last_title_yna.txt"
     },
     {
-        "name": "한국경제 경제", # 증권 대신 경제 섹션 사용 (404 에러 방지)
-        "url": "https://www.hankyung.com/feed/economy", 
+        "name": "한국경제 증권", # 증권 대신 경제 섹션 사용 (404 에러 방지)
+        "url": "https://www.hankyung.com/feed/finance", 
         "db": "last_title_hk.txt"
     }
 ]
