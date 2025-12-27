@@ -6,9 +6,8 @@ from urllib.parse import quote
 # 환경 변수 설정
 token = os.environ.get('TELEGRAM_TOKEN')
 chat_id = os.environ.get('CHAT_ID')
-DB_FILE = "last_title.txt"
 
-def get_latest_news():
+def get_all_news():
     keyword = quote("경제")
     url = f"https://news.google.com/rss/search?q={keyword}+site:news.naver.com&hl=ko&gl=KR&ceid=KR:ko"
     
@@ -18,63 +17,50 @@ def get_latest_news():
     
     try:
         resp = requests.get(url, headers=headers, timeout=15)
-        if resp.status_code != 200: return None, None
-
         content = resp.text
-        items = re.findall(r'<item>(.*?)</item>', content, re.DOTALL | re.IGNORECASE)
         
-        print(f"로그: 총 {len(items)}개의 후보 중 진짜 뉴스를 선별합니다.")
+        # 1. <item> 태그 단위로 모든 기사 덩어리를 찾습니다.
+        items = re.findall(r'<item>(.*?)</item>', content, re.DOTALL | re.IGNORECASE)
+        print(f"로그: 총 {len(items)}개의 기사를 발견했습니다.")
 
-        for idx, item in enumerate(items):
+        results = []
+        for item in items:
+            # 2. 각 아이템 안에서 제목만 추출
             title_match = re.search(r'<title[^>]*>(.*?)</title>', item, re.DOTALL | re.IGNORECASE)
-            link_match = re.search(r'<link[^>]*>(.*?)</link>', item, re.DOTALL | re.IGNORECASE)
-            
-            if title_match and link_match:
+            if title_match:
                 title = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', title_match.group(1)).strip()
-                link = re.sub(r'<!\[CDATA\[|\]\]>|<[^>]*>', '', link_match.group(1)).strip()
-                
-                # [제목 선별 기준 강화] 
-                # 제목이 20자보다 길어야 진짜 뉴스 기사 제목으로 인정합니다. (단순 카테고리명 방지)
-                if len(title) > 20 and "naver.com" not in title.lower():
-                    clean_title = title.split(' - ')[0].strip()
-                    print(f"로그: {idx+1}번째 항목에서 진짜 뉴스 확정! ({clean_title[:30]}...)")
-                    return clean_title, link
+                # 꼬리표 제거
+                title = title.split(' - ')[0].strip()
+                results.append(title)
+        
+        return results
                     
     except Exception as e:
-        print(f"추출 오류: {e}")
-        
-    return None, None
+        print(f"데이터 추출 중 에러: {e}")
+        return []
 
 def main():
-    print("--- 뉴스 본문 제목 추출 모드 ---")
-    title, link = get_latest_news()
+    print("--- 100개 기사 무조건 전수 전송 가동 ---")
+    news_list = get_all_news()
     
-    if not title:
-        print("로그: 유효한 뉴스 문장을 찾지 못했습니다.")
+    if not news_list:
+        print("로그: 기사를 하나도 찾지 못했습니다.")
         return
 
-    # 중복 체크
-    last_title = ""
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            last_title = f.read().strip()
-
-    if title == last_title:
-        print(f"로그: 새로운 뉴스가 아직 올라오지 않았습니다. (최신: {title[:15]}...)")
-        return
-
-    # 텔레그램 전송
-    message = f"📢 [경제 실시간 속보]\n\n📌 {title}\n\n🔗 링크: {link}"
-    send_url = f"https://api.telegram.org/bot{token}/sendMessage"
+    # 3. 텔레그램 전송 (너무 많으면 텔레그램에서 차단될 수 있으니 10개씩 묶어서 보냅니다)
+    print(f"로그: 총 {len(news_list)}개의 제목을 전송합니다.")
     
-    try:
-        res = requests.post(send_url, data={'chat_id': chat_id, 'text': message})
-        if res.status_code == 200:
-            with open(DB_FILE, "w", encoding="utf-8") as f:
-                f.write(title)
-            print(f"--- 전송 완료: {title[:20]}... ---")
-    except Exception as e:
-        print(f"전송 에러: {e}")
+    # 5개씩 끊어서 한 메시지에 담아 보냅니다 (도배 방지)
+    for i in range(0, len(news_list), 5):
+        chunk = news_list[i:i+5]
+        message = "📢 [수집된 뉴스 리스트]\n\n"
+        for idx, t in enumerate(chunk):
+            message += f"{i + idx + 1}. {t}\n"
+        
+        send_url = f"https://api.telegram.org/bot{token}/sendMessage"
+        requests.post(send_url, data={'chat_id': chat_id, 'text': message})
+        
+    print("--- 전송 시도 완료 ---")
 
 if __name__ == "__main__":
     main()
