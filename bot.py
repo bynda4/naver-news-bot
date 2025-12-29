@@ -20,16 +20,6 @@ NEWS_SOURCES = [
         "name": "매일경제 증권",
         "url": "https://www.mk.co.kr/rss/50200011/", 
         "db": "last_title_mk.txt"
-    },
-    {
-        "name": "서울경제 증권",
-        "url": "https://www.sedaily.com/rss/section/04/",
-        "db": "last_title_se.txt"
-    },
-    {
-        "name": "이투데이 비즈니스",
-        "url": "https://www.etoday.co.kr/rss/section/business.xml",
-        "db": "last_title_et.txt"
     }
 ]
 
