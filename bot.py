@@ -17,19 +17,19 @@ NEWS_SOURCES = [
         "db": "last_title_hk.txt"
     },
     {
-        "name": "매일경제 증권", # 매경 증권 섹션 추가
+        "name": "매일경제 증권",
         "url": "https://www.mk.co.kr/rss/50200011/", 
         "db": "last_title_mk.txt"
     },
     {
-        "name": "머니투데이 증권",
-        "url": "https://www.moneytoday.co.kr/rss/news/stock.xml",
-        "db": "last_title_mt.txt"
+        "name": "서울경제 증권",
+        "url": "https://www.sedaily.com/rss/section/04/",
+        "db": "last_title_se.txt"
     },
     {
-        "name": "MBN 경제",
-        "url": "https://www.mbn.co.kr/rss/news/economics.xml",
-        "db": "last_title_mbn.txt"
+        "name": "이투데이 비즈니스",
+        "url": "https://www.etoday.co.kr/rss/section/business.xml",
+        "db": "last_title_et.txt"
     }
 ]
 
