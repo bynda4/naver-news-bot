@@ -12,14 +12,18 @@ NEWS_SOURCES = [
         "db": "last_title_yna.txt"
     },
     {
-        "name": "한국경제 증권", # 증권 대신 경제 섹션 사용 (404 에러 방지)
+        "name": "한국경제 증권",
         "url": "https://www.hankyung.com/feed/finance", 
         "db": "last_title_hk.txt"
+    },
+    {
+        "name": "매일경제 증권", # 매경 증권 섹션 추가
+        "url": "https://www.mk.co.kr/rss/50200011/", 
+        "db": "last_title_mk.txt"
     }
 ]
 
 def fetch_latest(url):
-    # 브라우저인 것처럼 속이는 헤더 보강
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -29,16 +33,13 @@ def fetch_latest(url):
         resp = requests.get(url, headers=headers, timeout=20)
         resp.encoding = 'utf-8'
         
-        # 한국경제의 경우 응답이 200이 아니면 차단된 것
         if resp.status_code != 200:
             print(f"로그: {url} 접속 실패 (상태코드: {resp.status_code})")
             return None, None
 
-        # <item> 태그 추출 (대소문자 무시)
         items = re.findall(r'<item>(.*?)</item>', resp.text, re.DOTALL | re.IGNORECASE)
         if items:
             item = items[0]
-            # 제목 추출 로직 강화 (CDATA 및 HTML 태그 제거)
             title_match = re.search(r'<title[^>]*>(.*?)</title>', item, re.DOTALL | re.IGNORECASE)
             link_match = re.search(r'<link[^>]*>(.*?)</link>', item, re.DOTALL | re.IGNORECASE)
             
