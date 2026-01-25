@@ -27,8 +27,18 @@ NEWS_SOURCES = [
     },
     {
         "name": "매일경제 증권",
-        "url": "https://www.mk.co.kr/rss/50200011/", 
+        "url": "https://www.mk.co.kr/rss/50200011/",
         "db": "last_title_mk.txt"
+    },
+    {
+        "name": "뉴시스 금융",
+        "url": "https://www.newsis.com/RSS/bank.xml",
+        "db": "last_title_newsis.txt"
+    },
+    {
+        "name": "머니투데이 전체",
+        "url": "https://rss.mt.co.kr/mt_news.xml",
+        "db": "last_title_mt.txt"
     }
 ]
 
