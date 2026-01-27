@@ -1,6 +1,7 @@
 import requests
 import os
 import time
+import html
 import feedparser
 
 # 스크립트 위치 기준 절대 경로
@@ -56,7 +57,7 @@ def fetch_latest(url, max_retries=3):
 
             if feed.entries:
                 entry = feed.entries[0]
-                title = entry.get('title', '').strip()
+                title = html.unescape(entry.get('title', '')).strip()
                 link = entry.get('link', '').strip()
 
                 if title and link:
