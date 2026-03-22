@@ -15,6 +15,20 @@ if not token or not chat_id:
     print("에러: TELEGRAM_TOKEN 또는 CHAT_ID가 설정되지 않았습니다.")
     exit(1)
 
+SPORTS_KEYWORDS = [
+    '야구', '축구', '농구', '배구', '골프', '테니스', '수영', '육상', '체조', '씨름',
+    '격투기', '권투', '복싱', '레슬링', '유도', '태권도', '펜싱', '사격', '양궁',
+    '올림픽', '월드컵', '아시안게임', '패럴림픽',
+    'K리그', 'EPL', 'NBA', 'NFL', 'MLB', 'KBO', 'KBL', 'V리그',
+    '감독', '선수', '코치', '드래프트', '트레이드', '이적',
+    '홈런', '득점', '골', '슛', '리바운드', '안타', '삼진',
+    '경기', '시즌', '리그', '토너먼트', '챔피언십', '플레이오프', '결승',
+    '스포츠',
+]
+
+def is_sports_article(title):
+    return any(kw in title for kw in SPORTS_KEYWORDS)
+
 NEWS_SOURCES = [
     {
         "name": "연합뉴스 속보",
@@ -56,11 +70,15 @@ def fetch_latest(url, max_retries=3):
                 continue
 
             if feed.entries:
-                entry = feed.entries[0]
-                title = html.unescape(entry.get('title', '')).strip()
-                link = entry.get('link', '').strip()
+                for entry in feed.entries:
+                    title = html.unescape(entry.get('title', '')).strip()
+                    link = entry.get('link', '').strip()
 
-                if title and link:
+                    if not title or not link:
+                        continue
+                    if is_sports_article(title):
+                        print(f"로그: 스포츠 기사 건너뜀 - {title}")
+                        continue
                     return title, link
 
         except Exception as e:
