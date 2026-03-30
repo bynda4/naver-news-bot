@@ -33,7 +33,15 @@ SPORTS_KEYWORDS = [
     '유벤투스', '인터밀란', 'AC밀란', '파리생제르맹', 'PSG',
 ]
 
-def is_sports_article(title):
+SPORTS_URL_PATTERNS = [
+    '/sports/', '/sport/', '/baseball/', '/football/', '/soccer/',
+    '/basketball/', '/golf/', '/tennis/',
+    'sports.', 'sport.',
+]
+
+def is_sports_article(title, link=''):
+    if any(p in link.lower() for p in SPORTS_URL_PATTERNS):
+        return True
     return any(kw in title for kw in SPORTS_KEYWORDS)
 
 NEWS_SOURCES = [
@@ -83,7 +91,7 @@ def fetch_latest(url, max_retries=3):
 
                     if not title or not link:
                         continue
-                    if is_sports_article(title):
+                    if is_sports_article(title, link):
                         print(f"로그: 스포츠 기사 건너뜀 - {title}")
                         continue
                     return title, link
